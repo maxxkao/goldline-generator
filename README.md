@@ -8,7 +8,7 @@
 | `goldline-generator-v2.html` | V2：隨機產生、匯入 SVG（不含原圖）、匯入畫面比例不限 |
 | `index.html` | 入口頁，連到上面兩個版本 |
 
-# 金線圖樣產生器-V2版 Goldline Pattern Generator-V2
+# V2版 Goldline Pattern Generator-V2
 https://maxxkao.github.io/goldline-generator/goldline-generator-v2.html
 
 ## 功能

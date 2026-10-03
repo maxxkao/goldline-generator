@@ -1,3 +1,5 @@
+https://maxxkao.github.io/goldline-generator/goldline-generator-v2.html
+
 # 金線圖樣產生器 Goldline Pattern Generator
 
 以 WebGL 即時描繪的金線幾何動畫工具。每個版本都是單一 HTML 檔，不需要安裝或伺服器端程式，用瀏覽器開啟即可使用。

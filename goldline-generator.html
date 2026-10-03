@@ -123,7 +123,7 @@ input[type=color]{width:34px;height:28px;padding:0;border:1px solid var(--edge);
       <p class="hint">也可以把 SVG 檔直接拖曳到畫面上。AI、EPS、PDF 請先在 Illustrator 另存成 SVG，文字要先建立外框。</p>
       <div id="info" class="info"></div>
       <div class="row"><label for="margin">四周留白 <output></output></label><input type="range" id="margin" min="0" max="0.2" step="0.01" value="0"></div>
-      <div class="checks"><label><input type="checkbox" id="outline" checked>實心形狀先描外框</label></div>
+      <div class="checks"><label><input type="checkbox" id="outline" checked>實心形狀先描外框</label><label><input type="checkbox" id="skipBg" checked>略過整片背景色塊</label></div>
     </div>
 
     <h2>描線順序</h2>
@@ -188,7 +188,7 @@ input[type=color]{width:34px;height:28px;padding:0;border:1px solid var(--edge);
 
     <h2>播放與輸出</h2>
     <div class="row"><label for="spd">播放速度 <output></output></label><input type="range" id="spd" min="0.25" max="2" step="0.05"></div>
-    <div class="btnrow"><button id="rec">錄製一次完整動畫</button><button class="primary" id="saveVid" hidden>儲存影片</button><button id="svgOut">下載 SVG</button></div>
+    <div class="btnrow"><button id="rec">錄製一次完整動畫</button><button class="primary" id="saveVid" hidden>儲存影片</button><button id="svgOut">下載 SVG</button></div><div class="checks" style="margin-top:8px"><label><input type="checkbox" id="svgBg">下載的 SVG 包含底色</label></div>
     <div id="status" role="status"></div>
   </aside>
 </div>
@@ -456,14 +456,14 @@ E.saveVideo=status=>{if(E.lastVideo)E.saveBlob(E.lastVideo.blob,E.lastVideo.name
 E.stopRec=()=>{if(st.rec&&st.rec.state!=='inactive'){E.setPlaying(false);setTimeout(()=>st.rec&&st.rec.stop(),250);}};
 
 /* ---------- 匯出 SVG ---------- */
-E.toSVG=function(){const f=n=>+n.toFixed(2);const col=P.lineHex,bg='#'+P.bg.map(v=>Math.round(v*255).toString(16).padStart(2,'0')).join('');
-  let s=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${E.DW} ${E.DH}" width="${E.DW}" height="${E.DH}">\n<rect width="100%" height="100%" fill="${bg}"/>\n<g fill="none" stroke="${col}" stroke-width="${P.lw}" stroke-linecap="round" stroke-linejoin="round">\n`;
+E.toSVG=function(o={}){const f=n=>+n.toFixed(2);const col=P.lineHex,bg='#'+P.bg.map(v=>Math.round(v*255).toString(16).padStart(2,'0')).join('');
+  let s=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${E.DW} ${E.DH}" width="${E.DW}" height="${E.DH}">\n${o.bg?`<rect data-goldline-bg="1" width="100%" height="100%" fill="${bg}"/>\n`:''}<g fill="none" stroke="${col}" stroke-width="${P.lw}" stroke-linecap="round" stroke-linejoin="round">\n`;
   for(const k of E.strokes)s+=`<path d="M${k.pts.map(p=>f(p[0])+' '+f(p[1])).join('L')}"/>\n`;
   s+=`</g>\n<g fill="${col}">\n`;
   for(const F of E.fills){if(F.pts&&!F.complex)s+=`<path d="M${F.pts.map(p=>f(p[0])+' '+f(p[1])).join('L')}Z"/>\n`;
     else for(let i=0;i<F.tris.length;i+=3)s+=`<path d="M${[0,1,2].map(j=>f(F.tris[i+j][0])+' '+f(F.tris[i+j][1])).join('L')}Z"/>\n`;}
   s+='</g>\n';
-  const t=E.text;if(t&&P.textOn)t.lines.forEach((ln,i)=>{s+=`<text x="${f(t.x)}" y="${f(t.y+i*t.lead)}" font-family="Inter, Helvetica Neue, Arial, sans-serif" font-weight="500" font-size="${f(t.fs)}" fill="${i<(t.goldCount??3)?col:'#aebdc1'}">${ln.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</text>\n`;});
+  const t=E.text;if(t&&P.textOn&&o.text!==false)t.lines.forEach((ln,i)=>{s+=`<text x="${f(t.x)}" y="${f(t.y+i*t.lead)}" font-family="Inter, Helvetica Neue, Arial, sans-serif" font-weight="500" font-size="${f(t.fs)}" fill="${i<(t.goldCount??3)?col:'#aebdc1'}">${ln.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</text>\n`;});
   return s+'</svg>\n';};
 return E;
 }
@@ -805,9 +805,10 @@ function parse(text,name){
     svg.setAttribute('viewBox',`${vb.x} ${vb.y} ${vb.width} ${vb.height}`);}
   svg.setAttribute('width',vb.width);svg.setAttribute('height',vb.height);svg.setAttribute('preserveAspectRatio','none');
   const asp=vb.height/vb.width;let W,H;if(asp>=1){W=768;H=Math.round(Math.min(1700,768*asp));}else{W=1024;H=Math.max(300,Math.round(1024*asp));}
-  const items=[];let ord=0,nText=svg.querySelectorAll('text').length,nImg=svg.querySelectorAll('image').length,nUse=svg.querySelectorAll('use').length,nGrad=0;
+  const items=[];let ord=0,nBg=0,nText=svg.querySelectorAll('text').length,nImg=svg.querySelectorAll('image').length,nUse=svg.querySelectorAll('use').length,nGrad=0;
   for(const el of svg.querySelectorAll('path,line,polyline,polygon,rect,circle,ellipse')){
     if(el.closest('defs,clipPath,mask,symbol,pattern,marker'))continue;
+    if(el.hasAttribute('data-goldline-bg')){nBg++;continue;}
     const cs=getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden'||parseFloat(cs.opacity)===0)continue;
     const hasFill=cs.fill!=='none'&&parseFloat(cs.fillOpacity)>0;const sw=parseFloat(cs.strokeWidth)||0;
     const hasStroke=cs.stroke!=='none'&&sw>0&&parseFloat(cs.strokeOpacity)>0;
@@ -822,10 +823,12 @@ function parse(text,name){
       if(prev&&Math.hypot(p[0]-prev[0],p[1]-prev[1])>stepV*2.5+.01){if(cur.length>1)subs.push(cur);cur=[];}
       cur.push(p);prev=p;}
     if(cur.length>1)subs.push(cur);
-    items.push({subs,hasFill,hasStroke,sw:sw*k,ord:ord++});}
+    let bx0=1e9,by0=1e9,bx1=-1e9,by1=-1e9;for(const sp of subs)for(const p of sp){bx0=Math.min(bx0,p[0]);bx1=Math.max(bx1,p[0]);by0=Math.min(by0,p[1]);by1=Math.max(by1,p[1]);}
+    const bg=hasFill&&!hasStroke&&(bx1-bx0)>=vb.width*.98&&(by1-by0)>=vb.height*.98;
+    items.push({subs,hasFill,hasStroke,sw:sw*k,ord:ord++,bg});}
   host.innerHTML='';
   if(!items.length)throw new Error('檔案裡找不到可以描繪的線條或形狀。');
-  return{name,vb,W,H,items,nText,nImg,nUse,nGrad};}
+  return{name,vb,W,H,items,nBg,nText,nImg,nUse,nGrad};}
 
 /* ---------- 建立場景 ---------- */
 function build(){
@@ -833,7 +836,8 @@ function build(){
   const S=Math.min((W-2*mg)/vb.width,(H-2*mg)/vb.height),ox=(W-vb.width*S)/2,oy=(H-vb.height*S)/2;
   const tr=p=>[ox+p[0]*S,oy+p[1]*S];const eps=.12;
   const strokes=[],fills=[];let nS=0,nF=0;
-  for(const it of geo.items){const subs=it.subs.map(s=>rdp(s.map(tr),eps));
+  let skipped=geo.nBg;
+  for(const it of geo.items){if(it.bg&&$('skipBg').checked){skipped++;continue;}const subs=it.subs.map(s=>rdp(s.map(tr),eps));
     if(it.hasStroke){for(const [j,s] of subs.entries()){strokes.push({pts:s,w:it.sw*S/2.4,ord:it.ord+j*1e-4});nS++;}}
     if(it.hasFill){const rings=subs.filter(s=>s.length>2).map(s=>{const r=s.slice();if(dist(r[0],r[r.length-1])<.5)r.pop();return r;});
       const tris=triangulate(rings);if(!tris.length)continue;
@@ -841,7 +845,7 @@ function build(){
       if(opt.outline&&!it.hasStroke){let best=null;for(const [j,s] of subs.entries()){const st={pts:[...s,s[0]],w:1,ord:it.ord+j*1e-4};strokes.push(st);if(!best||st.pts.length>best.pts.length)best=st;}f.link=best;}
       fills.push(f);nF++;}}
   show({W,H,strokes,fills,seed:[W*.12,H*.1]});
-  const warn=[];if(geo.nText)warn.push(`${geo.nText} 個文字物件（請先建立外框）`);if(geo.nImg)warn.push(`${geo.nImg} 張點陣圖`);if(geo.nUse)warn.push(`${geo.nUse} 個 use 參照`);if(geo.nGrad)warn.push(`${geo.nGrad} 個漸層／圖樣填色（以單色顯示）`);
+  const warn=[];if(skipped)warn.push(`${skipped} 個整片背景色塊`);if(geo.nText)warn.push(`${geo.nText} 個文字物件（請先建立外框）`);if(geo.nImg)warn.push(`${geo.nImg} 張點陣圖`);if(geo.nUse)warn.push(`${geo.nUse} 個 use 參照`);if(geo.nGrad)warn.push(`${geo.nGrad} 個漸層／圖樣填色（以單色顯示）`);
   $('info').innerHTML=`<b>${esc(geo.name)}</b><br>描線 ${nS} 條 · 實心 ${nF} 個`+(warn.length?`<br><span class="warn">已略過：${warn.join('、')}</span>`:'');}
 const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
@@ -891,7 +895,7 @@ $('floats').onchange=e=>{state.floats=e.target.checked;generate();};
 /* ---------- 匯入 SVG ---------- */
 $('file').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>load(t,f.name));e.target.value='';});
 $('sample').onclick=()=>load(SAMPLE,'範例：聖誕樹.svg');
-$('fromGen').onclick=()=>{const keep=src;src='gen';generate();const svg=E.toSVG().replace(/<rect width="100%"[^>]*\/>/,'').replace(/<text[\s\S]*?<\/text>\n?/g,'');src=keep;load(svg,`隨機圖樣 ${state.split}-${state.motif}.svg`);};
+$('fromGen').onclick=()=>{const keep=src;src='gen';generate();const svg=E.toSVG({bg:false,text:false});src=keep;load(svg,`隨機圖樣 ${state.split}-${state.motif}.svg`);};
 const stage=$('stage');
 stage.addEventListener('dragover',e=>{e.preventDefault();stage.classList.add('drop');});
 stage.addEventListener('dragleave',()=>stage.classList.remove('drop'));
@@ -901,6 +905,7 @@ stage.addEventListener('drop',e=>{e.preventDefault();stage.classList.remove('dro
 const mEl=$('margin'),mOut=mEl.previousElementSibling.querySelector('output');
 mEl.addEventListener('input',()=>{opt.margin=+mEl.value;mOut.textContent=Math.round(opt.margin*100)+'%';mEl.style.setProperty('--p',(opt.margin/.2*100)+'%');});
 mEl.addEventListener('change',()=>{if(src==='svg')build();});mEl.dispatchEvent(new Event('input'));
+$('skipBg').onchange=()=>{if(src==='svg')build();};
 $('outline').onchange=e=>{opt.outline=e.target.checked;if(src==='svg')build();};
 
 /* ---------- 描線順序 ---------- */
@@ -918,7 +923,7 @@ for(const [id,fmt] of [['fsz',v=>Math.round(v*100)+'%'],['lh',v=>v.toFixed(2)+' 
   el.dispatchEvent(new Event('input'));}
 let tt=0;$('txt').addEventListener('input',()=>{textDirty=true;clearTimeout(tt);tt=setTimeout(applyText,150);});
 $('svgOut').onclick=()=>{const name=src==='orig'?'goldline-original.svg':src==='gen'?`goldline-${state.lib}-${state.split}-${state.motif}.svg`:'goldline-import.svg';
-  E.saveBlob(new Blob([E.toSVG()],{type:'image/svg+xml'}),name,status);};
+  E.saveBlob(new Blob([E.toSVG({bg:$('svgBg').checked})],{type:'image/svg+xml'}),name,status);};
 
 /* ---------- 啟動 ---------- */
 const fontReady=document.fonts?Promise.race([document.fonts.load('500 40px Inter'),new Promise(r=>setTimeout(r,2500))]):Promise.resolve();

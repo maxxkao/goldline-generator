@@ -432,12 +432,15 @@ E.setPlaying=v=>{st.playing=v;if(E.onPlay)E.onPlay(v);};
 /* ---------- 輸出 ---------- */
 let dl=null;
 if(window.claude&&typeof window.claude.use==='function')window.claude.use('downloads').then(x=>{dl=x;}).catch(()=>{});
+// 手機／平板才用系統分享選單；電腦一律直接下載
+E.isMobile=()=>{if(navigator.userAgentData&&typeof navigator.userAgentData.mobile==='boolean'&&navigator.userAgentData.mobile)return true;
+  const ua=navigator.userAgent||'';if(/Android|iPhone|iPad|iPod|Mobile/i.test(ua))return true;return /Macintosh/.test(ua)&&navigator.maxTouchPoints>1;};
 // 儲存檔案：先用平台下載；不可用時改用系統分享選單（手機可存到相簿／檔案），最後才用一般下載連結
 E.saveBlob=async(blob,name,status)=>{
   if(dl){try{await dl.save({filename:name,data:blob});status&&status('已儲存 '+name);return;}
     catch(e){if(e&&e.code==='declined'){status&&status('已取消下載。');return;}if(e&&e.code==='rate_limited'){status&&status('儲存視窗已開啟，請稍候再試。');return;}}}
   try{const file=new File([blob],name,{type:blob.type||''});
-    if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});status&&status('已開啟分享選單，可選「儲存影片」或「儲存到檔案」。');return;}}
+    if(E.isMobile()&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});status&&status('已開啟分享選單，可選「儲存影片」或「儲存到檔案」。');return;}}
   catch(e){if(e&&e.name==='AbortError'){status&&status('已取消。');return;}}
   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
   if(E.statusEl){E.statusEl.innerHTML='';E.statusEl.append('已輸出 '+name+'。若沒有開始下載，請');const l=document.createElement('a');l.href=url;l.target='_blank';l.rel='noopener';l.textContent='點這裡開啟檔案';l.style.color='inherit';E.statusEl.append(l,'，再長按或用分享選單儲存。');}
